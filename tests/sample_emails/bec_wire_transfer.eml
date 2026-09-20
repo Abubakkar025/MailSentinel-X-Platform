@@ -1,0 +1,45 @@
+From: "Robert Chen - CFO" <r.chen@company-financial.net>
+To: accounting@company.com
+Subject: Urgent Wire Transfer Required - Confidential
+Date: Fri, 12 Sep 2026 16:45:00 -0400
+Message-ID: <bec-wire-20260912@company-financial.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Return-Path: <r.chen@company-financial.net>
+Reply-To: robert.chen.private@gmail.com
+X-Mailer: Thunderbird 115.0
+Authentication-Results: mx.company.com;
+    spf=softfail (domain does not designate sending IP) smtp.mailfrom=company-financial.net;
+    dkim=none (no DKIM signature found);
+    dmarc=fail (p=NONE) header.from=company-financial.net
+Received: from smtp-relay.gmail.com (smtp-relay.gmail.com [74.125.68.26])
+    by mx.company.com with ESMTPS id bec001
+    for <accounting@company.com>;
+    Fri, 12 Sep 2026 16:45:05 -0400 (EDT)
+Received: from [192.168.1.100] (unknown [103.45.67.89])
+    by smtp-relay.gmail.com with ESMTPSA id xyz789
+    for <accounting@company.com>;
+    Fri, 12 Sep 2026 16:45:02 -0400 (EDT)
+
+Hi,
+
+I need you to process an urgent wire transfer today before end of business. This is related to a confidential acquisition deal that we cannot discuss openly.
+
+Please wire $47,500 to the following account:
+
+Bank: First National Bank
+Account Name: Strategic Partners LLC
+Account Number: 8827364510
+Routing Number: 021000089
+Reference: Project Alpha - Q3
+
+This needs to be completed TODAY. Do not discuss this with anyone else as it is strictly confidential until the deal closes next week.
+
+I'm in meetings all afternoon so please do not call me. Just confirm via email once the transfer is complete.
+
+Thanks,
+Robert Chen
+Chief Financial Officer
+Company Inc.
+
+Sent from my iPhone

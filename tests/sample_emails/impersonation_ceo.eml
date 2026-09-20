@@ -1,0 +1,42 @@
+From: "David Miller - CEO" <david.miller@company.com>
+To: hr@company.com
+Subject: Employee Information Request - Urgent
+Date: Wed, 10 Sep 2026 09:15:00 -0400
+Message-ID: <impersonation-ceo-001@mail.attacker-server.ru>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+Return-Path: <d.miller.ceo@protonmail.com>
+Reply-To: d.miller.ceo@protonmail.com
+X-Mailer: RoundCube Webmail/1.6.0
+Authentication-Results: mx.company.com;
+    spf=fail (domain company.com does not authorize 91.234.56.78) smtp.mailfrom=protonmail.com;
+    dkim=pass header.d=protonmail.com header.s=protonmail3;
+    dmarc=fail (p=QUARANTINE) header.from=company.com
+Received: from mail-40141.protonmail.ch (mail-40141.protonmail.ch [185.70.40.141])
+    by mx.company.com with ESMTPS id imp001
+    for <hr@company.com>;
+    Wed, 10 Sep 2026 09:15:08 -0400 (EDT)
+Received: from smtp.protonmail.ch (unknown [91.234.56.78])
+    by mail-40141.protonmail.ch with ESMTP id abc123
+    for <hr@company.com>;
+    Wed, 10 Sep 2026 09:15:04 -0400 (EDT)
+
+Hi,
+
+I need you to send me the updated employee roster with the following information for all staff:
+
+- Full names
+- Social Security Numbers
+- Date of birth
+- Home addresses
+- Bank account details (for direct deposit)
+- Salary information
+
+I need this for an urgent board meeting preparation. Please compile this and send it to me directly at this email address by end of day.
+
+This is confidential - please do not share this request with anyone else.
+
+Best regards,
+David Miller
+Chief Executive Officer
+Company Inc.
