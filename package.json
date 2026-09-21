@@ -1,1 +1,14 @@
-{ "name": "mailsentinel-x-monorepo", "private": true, "workspaces": ["apps/*", "packages/*"] }
+{
+  "name": "mailsentinel-x-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "dependencies": {
+    "@vercel/speed-insights": "^2.0.0"
+  },
+  "allowScripts": {
+    "unrs-resolver@1.12.2": true
+  }
+}
