@@ -151,6 +151,14 @@ export function MapStatusBar({ status }: { status: ThreatIntelStatus }) {
     dotColor = "#ef4444";
     label = "THREAT INTEL OFFLINE";
     tagColor = "#ef4444";
+  } else if (data?.dataMode === "demo") {
+    dotColor = "#eab308";
+    label = "DEMO DATA";
+    tagColor = "#eab308";
+  } else if (data?.dataMode === "mixed") {
+    dotColor = "#f59e0b";
+    label = "MIXED DATA";
+    tagColor = "#f59e0b";
   } else {
     dotColor = "#22c55e";
     label = "LIVE INTELLIGENCE";
@@ -174,9 +182,9 @@ export function MapStatusBar({ status }: { status: ThreatIntelStatus }) {
       {!blocked && data && (
         <>
           <StatChip icon={Radio} value={data.geolocated} label={`${data.totalThreats} total`} accent />
-          <StatChip icon={Activity} value={data.arcs.length} label="arcs" />
+          <StatChip icon={Activity} value={data.arcs.length} label="relations" />
           <StatChip icon={GitBranch} value={data.campaigns.length} label="campaigns" />
-          {data.isDemo && (
+          {(data.dataMode === "demo" || data.dataMode === "mixed") && (
             <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-widest text-amber-400">
               DEMO DATA
             </span>

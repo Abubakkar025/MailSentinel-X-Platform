@@ -1,12 +1,13 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Activity, ExternalLink, GitBranch, Globe2, RefreshCw, X } from "lucide-react";
 import { api } from "@/lib/api";
+import { useSystem } from "@/lib/event-bus";
 import type { Campaign, CaseListResponse, CaseResponse, GeoThreat, RiskSeverity } from "@/lib/types";
-import { SEVERITY_COLORS, SEVERITY_ORDER, type EnrichedThreat, type MapFocusRequest, type ThreatArc, type ThreatMapData } from "@/components/threat-map/types";
+import { SEVERITY_COLORS, SEVERITY_ORDER, type EnrichedThreat, type MapFocusRequest, type ThreatArc, type ThreatDataMode, type ThreatMapData } from "@/components/threat-map/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 
@@ -41,7 +42,7 @@ function enrichThreats(
       campaignId: c?.campaign_id ?? campaign?.id,
       campaignName: campaign?.name,
       createdAt: c?.created_at,
-      isDemo: c?.is_demo ?? false,
+      isDemo: c?.is_demo ?? t.is_demo ?? false,
       asn: d?.asn,
       asnOrg: d?.asnOrg,
       usageType: d?.usageType,
@@ -87,10 +88,73 @@ function buildArcs(threats: EnrichedThreat[]): ThreatArc[] {
   return arcs.slice(0, 12);
 }
 
+type ThreatIntelStatus = "loading" | "online" | "degraded" | "offline";
+
+function StatusDot({ color, pulse = false }: { color: string; pulse?: boolean }) {
+  return (
+    <span
+      className={`h-1.5 w-1.5 rounded-full ${pulse ? "status-blink" : ""}`}
+      style={{ background: color, boxShadow: `0 0 6px ${color}` }}
+    />
+  );
+}
+
+/**
+ * Per-service state derived from real fetch/renderer outcomes — never hard-coded.
+ * API comes from the shared health poll, Threat Intel from this page's load()
+ * results, Globe from the renderer itself. Services stay independent: the globe
+ * does not go offline just because threat intel does.
+ */
+function ServiceStatusRow({
+  apiOnline,
+  tiStatus,
+  globeOnline,
+  dataMode,
+}: {
+  apiOnline: boolean | null;
+  tiStatus: ThreatIntelStatus;
+  globeOnline: boolean | null;
+  dataMode: ThreatDataMode;
+}) {
+  const api = apiOnline === null ? { label: "API CHECKING", color: "#eab308", pulse: true }
+    : apiOnline ? { label: "API ONLINE", color: "#22c55e", pulse: false }
+    : { label: "API OFFLINE", color: "#ef4444", pulse: false };
+  const ti = tiStatus === "loading" ? { label: "TI CHECKING", color: "#eab308", pulse: true }
+    : tiStatus === "online" ? { label: "THREAT INTEL ONLINE", color: "#22c55e", pulse: false }
+    : tiStatus === "degraded" ? { label: "TI DEGRADED", color: "#f59e0b", pulse: false }
+    : { label: "TI OFFLINE", color: "#ef4444", pulse: false };
+  const globe = globeOnline === null ? { label: "GLOBE CHECKING", color: "#eab308", pulse: true }
+    : { label: "GLOBE ONLINE", color: "#22c55e", pulse: false };
+  const mode = dataMode === "live" ? { label: "LIVE", color: "#22c55e" }
+    : dataMode === "mixed" ? { label: "MIXED DATA", color: "#f59e0b" }
+    : dataMode === "demo" ? { label: "DEMO DATA", color: "#eab308" }
+    : { label: "NO DATA", color: "#64748b" };
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-800/80 bg-slate-900/60 px-3 py-1.5">
+      <span className="flex items-center gap-1.5 font-mono text-[9px] font-bold tracking-widest" style={{ color: api.color }}>
+        <StatusDot color={api.color} pulse={api.pulse} /> {api.label}
+      </span>
+      <span className="flex items-center gap-1.5 font-mono text-[9px] font-bold tracking-widest" style={{ color: ti.color }}>
+        <StatusDot color={ti.color} pulse={ti.pulse} /> {ti.label}
+      </span>
+      <span className="flex items-center gap-1.5 font-mono text-[9px] font-bold tracking-widest" style={{ color: globe.color }}>
+        <StatusDot color={globe.color} pulse={globe.pulse} /> {globe.label}
+      </span>
+      <span className="flex items-center gap-1.5 font-mono text-[9px] font-bold tracking-widest" style={{ color: mode.color }}>
+        <StatusDot color={mode.color} /> {mode.label}
+      </span>
+    </div>
+  );
+}
+
 interface ActiveFilter {
-  kind: "severity" | "country" | "campaign";
+  kind: "severity" | "country" | "campaign" | "asn";
   value: string;
 }
+
+const asnKey = (t: Pick<EnrichedThreat, "asnOrg" | "asn">) => t.asnOrg || t.asn || "Unattributed";
+
+const POLL_INTERVAL_MS = 60_000;
 
 export default function ThreatMapPage() {
   const router = useRouter();
@@ -103,29 +167,52 @@ export default function ThreatMapPage() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [focus, setFocus] = useState<MapFocusRequest | null>(null);
+  const [tiStatus, setTiStatus] = useState<ThreatIntelStatus>("loading");
+  const [globeOnline, setGlobeOnline] = useState<boolean | null>(null);
+  const apiOnline = useSystem((s) => s.apiOnline);
+  const events = useSystem((s) => s.events);
+  const loadingRef = useRef(false);
+  const lastLoadRef = useRef(0);
+  const lastSeenEventRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     setApiError(null);
+    setTiStatus("loading");
     let geo: GeoThreat[];
     try {
       geo = await api.getGeoThreats();
     } catch (e: any) {
       setApiError(e?.message || "Threat intelligence API unavailable.");
+      setTiStatus("offline");
+      useSystem.getState().setTiAvailable(false);
       setLoading(false);
+      loadingRef.current = false;
       return;
     }
+    useSystem.getState().setApiOnline(true);
+
+    // Fail-safe: only map indicators with valid coordinates. Never fabricate a position.
+    const mappable = geo.filter(
+      (t) => Number.isFinite(t.lat) && Number.isFinite(t.lng) && !(t.lat === 0 && t.lng === 0)
+    );
 
     const enrichment = await Promise.allSettled([
       api.getCases({ page_size: 100 }),
       api.getCampaigns(),
     ]);
 
+    const enrichmentOk = enrichment.every((r) => r.status === "fulfilled");
+    setTiStatus(enrichmentOk ? "online" : "degraded");
+    useSystem.getState().setTiAvailable(true);
+
     const caseList = enrichment[0].status === "fulfilled" ? (enrichment[0].value as CaseListResponse).items : [];
     const campList = enrichment[1].status === "fulfilled" ? (enrichment[1].value as Campaign[]) : [];
 
     const caseByNumber = new Map(caseList.map((c) => [c.case_number, c.id]));
-    const detailTargets = geo
+    const detailTargets = mappable
       .slice(0, 6)
       .map((t) => ({ ip: t.ip, caseId: caseByNumber.get(t.case_number) }))
       .filter((x): x is { ip: string; caseId: string } => Boolean(x.caseId));
@@ -145,21 +232,23 @@ export default function ThreatMapPage() {
       });
     });
 
-    const enriched = enrichThreats(geo, caseList, campList, details);
+    const enriched = enrichThreats(mappable, caseList, campList, details);
     setAllThreats(enriched);
     setCampaigns(campList);
+    // Timestamp reflects this actual successful refresh (client-side only, no SSR markup).
     setLastUpdated(
-      caseList.length > 0
-        ? new Date(Math.max(...caseList.map((c) => new Date(c.updated_at).getTime()))).toLocaleString(undefined, {
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : null
+      new Date().toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
     );
+    lastLoadRef.current = Date.now();
     setSelected((prev) => (prev && enriched.some((t) => t.ip === prev.ip) ? prev : null));
     setLoading(false);
+    loadingRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -167,16 +256,41 @@ export default function ThreatMapPage() {
     return () => clearTimeout(t);
   }, [load]);
 
+  // Safe polling: reuse the existing loader, skip hidden tabs and overlapping loads.
+  // Filters, selection and camera are preserved because load() never resets them.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.hidden) return;
+      void load();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [load]);
+
+  // Event-driven refresh: a new investigation/case elsewhere publishes a
+  // case/threat event on the shared bus — refetch so its marker appears.
+  useEffect(() => {
+    const latest = events[0];
+    if (!latest || (latest.type !== "case" && latest.type !== "threat")) return;
+    if (lastSeenEventRef.current === latest.id) return;
+    lastSeenEventRef.current = latest.id;
+    const at = new Date(latest.time).getTime();
+    if (Number.isFinite(at) && at > lastLoadRef.current && !document.hidden) {
+      void load();
+    }
+  }, [events, load]);
+
   const filteredThreats = useMemo(() => {
     const active = (kind: ActiveFilter["kind"]) => filters.find((f) => f.kind === kind)?.value;
     const sev = active("severity");
     const country = active("country");
     const campaign = active("campaign");
+    const asn = active("asn");
     return allThreats.filter(
       (t) =>
         (!sev || t.severity === sev) &&
         (!country || (t.country || "Unknown") === country) &&
-        (!campaign || t.campaignId === campaign)
+        (!campaign || t.campaignId === campaign) &&
+        (!asn || asnKey(t) === asn)
     );
   }, [allThreats, filters]);
 
@@ -204,7 +318,7 @@ export default function ThreatMapPage() {
     };
     const byAsn = new Map<string, { count: number; worst: RiskSeverity }>();
     for (const t of allThreats) {
-      const key = t.asnOrg || t.asn || "Unattributed";
+      const key = asnKey(t);
       const prev = byAsn.get(key) ?? { count: 0, worst: "low" as RiskSeverity };
       prev.count += 1;
       if (SEVERITY_ORDER.indexOf(t.severity) < SEVERITY_ORDER.indexOf(prev.worst)) prev.worst = t.severity;
@@ -240,6 +354,21 @@ export default function ThreatMapPage() {
     return [pts.reduce((s, p) => s + p.lng, 0) / pts.length, pts.reduce((s, p) => s + p.lat, 0) / pts.length];
   }, [allThreats]);
 
+  const asnCentroid = useCallback((asn: string): [number, number] => {
+    const pts = allThreats.filter((t) => asnKey(t) === asn);
+    if (pts.length === 0) return [0, 0];
+    return [pts.reduce((s, p) => s + p.lng, 0) / pts.length, pts.reduce((s, p) => s + p.lat, 0) / pts.length];
+  }, [allThreats]);
+
+  const dataMode: ThreatDataMode = useMemo(() => {
+    if (apiError) return "unavailable";
+    if (allThreats.length === 0) return loading ? "unavailable" : "live";
+    const demoCount = allThreats.filter((t) => t.isDemo).length;
+    if (demoCount === 0) return "live";
+    if (demoCount === allThreats.length) return "demo";
+    return "mixed";
+  }, [allThreats, apiError, loading]);
+
   const datus: ThreatMapData | null = loading ? null : {
     threats: filteredThreats,
     arcs,
@@ -247,7 +376,8 @@ export default function ThreatMapPage() {
     totalThreats: allThreats.length,
     geolocated: allThreats.length,
     lastUpdated,
-    isDemo: allThreats.some((t) => t.isDemo),
+    isDemo: dataMode === "demo" || dataMode === "mixed",
+    dataMode,
   };
 
   return (
@@ -282,10 +412,19 @@ export default function ThreatMapPage() {
 
       {apiError && <ErrorState title="Threat Intelligence Offline" message={apiError} onRetry={load} />}
 
+      <ServiceStatusRow apiOnline={apiOnline} tiStatus={tiStatus} globeOnline={globeOnline} dataMode={dataMode} />
+
       {filters.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {filters.map((f) => {
-            const label = f.kind === "severity" ? `Severity: ${f.value}` : f.kind === "country" ? `Country: ${f.value}` : `Campaign: ${f.value}`;
+            const label =
+              f.kind === "severity"
+                ? `Severity: ${f.value}`
+                : f.kind === "country"
+                  ? `Country: ${f.value}`
+                  : f.kind === "asn"
+                    ? `ASN: ${f.value}`
+                    : `Campaign: ${f.value}`;
             return (
               <span
                 key={`${f.kind}:${f.value}`}
@@ -387,15 +526,26 @@ export default function ThreatMapPage() {
             ) : stats.byAsn.length === 0 ? (
               <p className="text-xs text-slate-600">Enrichment pending</p>
             ) : (
-              stats.byAsn.map(([asn, { count, worst }]) => (
-                <div key={asn} className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400 truncate flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: SEVERITY_COLORS[worst] }} />
-                    {asn}
-                  </span>
-                  <span className="font-mono text-xs font-bold text-slate-200">{count}</span>
-                </div>
-              ))
+              stats.byAsn.map(([asn, { count, worst }]) => {
+                const active = filters.some((f) => f.kind === "asn" && f.value === asn);
+                return (
+                  <button
+                    key={asn}
+                    onClick={() => {
+                      applyFilter("asn", asn);
+                      setFocus({ kind: "asn", value: asn, coords: asnCentroid(asn) });
+                    }}
+                    title="Filter map to this infrastructure"
+                    className={`w-full flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors ${active ? "border border-blue-500/40 bg-blue-500/10" : "hover:bg-slate-800/50"}`}
+                  >
+                    <span className="text-xs text-slate-400 truncate flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: SEVERITY_COLORS[worst] }} />
+                      {asn}
+                    </span>
+                    <span className="font-mono text-xs font-bold text-slate-200">{count}</span>
+                  </button>
+                );
+              })
             )}
           </div>
 
@@ -447,6 +597,7 @@ export default function ThreatMapPage() {
             focus={focus}
             selected={selected}
             onSelectThreat={setSelected}
+            onEngineStatus={setGlobeOnline}
             onOpenCase={() => {
               if (selected?.case_number) router.push(`/cases?search=${encodeURIComponent(selected.case_number)}`);
               else router.push("/cases");

@@ -57,8 +57,11 @@ export interface ThreatArc {
 
 export type MapProjectionMode = "globe" | "mercator";
 
+/** Provenance of the threat dataset shown on the map. Never label demo data as live. */
+export type ThreatDataMode = "live" | "demo" | "mixed" | "unavailable";
+
 export interface MapFocusRequest {
-  kind: "country" | "ip" | "campaign" | "reset";
+  kind: "country" | "ip" | "campaign" | "asn" | "reset";
   value?: string;
   coords?: [number, number];
 }
@@ -71,4 +74,5 @@ export interface ThreatMapData {
   geolocated: number;
   lastUpdated: string | null;
   isDemo: boolean;
+  dataMode: ThreatDataMode;
 }

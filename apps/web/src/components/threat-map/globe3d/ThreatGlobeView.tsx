@@ -29,6 +29,8 @@ export interface ThreatGlobeViewProps {
   onSelectThreat?: (threat: EnrichedThreat | null) => void;
   onOpenCase?: () => void;
   selected?: EnrichedThreat | null;
+  /** Reports renderer visibility so the page can show honest per-service state. */
+  onEngineStatus?: (online: boolean) => void;
 }
 
 function detectWebGL(): boolean {
@@ -273,6 +275,7 @@ export function ThreatGlobeView({
   onSelectThreat,
   onOpenCase,
   selected,
+  onEngineStatus,
 }: ThreatGlobeViewProps) {
   const [mapStatus, setMapStatus] = useState<MapStatus>("booting");
   const [engineFailure, setEngineFailure] = useState<string | null>(null);
@@ -295,6 +298,7 @@ export function ThreatGlobeView({
   const handleEngineReady = () => {
     setMapStatus("online");
     setEngineFailure(null);
+    onEngineStatus?.(true);
   };
 
   const handleEngineFail = () => {
@@ -313,6 +317,12 @@ export function ThreatGlobeView({
   };
 
   const openCase = onOpenCase ?? (() => {});
+
+  // The 2D fallback is a working map surface, so report the renderer as
+  // visible in that path too — the globe never takes threat data down with it.
+  useEffect(() => {
+    if (fallback) onEngineStatus?.(true);
+  }, [fallback, onEngineStatus]);
 
   if (fallback) {
     return (

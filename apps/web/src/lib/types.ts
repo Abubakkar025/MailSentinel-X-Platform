@@ -181,6 +181,8 @@ export interface GeoThreat {
   abuse_score: number;
   severity: RiskSeverity;
   case_number: string;
+  /** True when the backend marks this indicator as demo/fixture data. */
+  is_demo?: boolean;
 }
 
 export interface Campaign {
