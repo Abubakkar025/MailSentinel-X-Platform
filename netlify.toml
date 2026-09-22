@@ -1,0 +1,10 @@
+# Netlify configuration for the MailSentinel-X monorepo.
+# The deployable site is the Next.js app in apps/web, which is an npm workspace
+# of the repository root. Installs happen at the root so the shared lockfile is
+# honoured, then the build is delegated into the workspace.
+[build]
+  command = "npm run build --workspace=apps/web"
+  publish = "apps/web/.next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
