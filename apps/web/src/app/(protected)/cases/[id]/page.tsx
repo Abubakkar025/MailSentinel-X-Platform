@@ -182,9 +182,9 @@ export default function CaseCommandCenter() {
               <ResultCard label="Sender"><span className="font-mono text-amber-400 break-all">{e.from_address}</span></ResultCard>
               <ResultCard label="Authentication">
                 <div className="flex flex-col gap-1.5 mt-1">
-                  <AuthBadge result={e.auth_results.spf_result} label="SPF" />
-                  <AuthBadge result={e.auth_results.dkim_result} label="DKIM" />
-                  <AuthBadge result={e.auth_results.dmarc_result} label="DMARC" />
+                  <AuthBadge result={e.auth_results?.spf_result ?? 'none'} label="SPF" />
+                  <AuthBadge result={e.auth_results?.dkim_result ?? 'none'} label="DKIM" />
+                  <AuthBadge result={e.auth_results?.dmarc_result ?? 'none'} label="DMARC" />
                 </div>
               </ResultCard>
             </div>

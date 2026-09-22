@@ -253,9 +253,9 @@ export default function InvestigatePage() {
                 <p className="text-sm font-semibold text-slate-300">{result.email.subject || "No Subject"}</p>
                 <p className="text-xs text-slate-500 font-mono">{result.email.from_address}</p>
                 <div className="flex items-center gap-2 flex-wrap pt-1">
-                  <AuthBadge result={result.email.auth_results.spf_result} label="SPF" />
-                  <AuthBadge result={result.email.auth_results.dkim_result} label="DKIM" />
-                  <AuthBadge result={result.email.auth_results.dmarc_result} label="DMARC" />
+                  <AuthBadge result={result.email.auth_results?.spf_result ?? 'none'} label="SPF" />
+                  <AuthBadge result={result.email.auth_results?.dkim_result ?? 'none'} label="DKIM" />
+                  <AuthBadge result={result.email.auth_results?.dmarc_result ?? 'none'} label="DMARC" />
                 </div>
               </div>
               <div className="space-y-2">

@@ -42,13 +42,14 @@ export function StatusBadge({ status, className = '' }: StatusBadgeProps) {
 }
 
 interface AuthBadgeProps {
-  result: string;
+  result?: string | null;
   label: string;
 }
 
 export function AuthBadge({ result, label }: AuthBadgeProps) {
-  const isPass = result === 'pass';
-  const isSoftfail = result === 'softfail';
+  const normalized = (result ?? 'unknown').toLowerCase();
+  const isPass = normalized === 'pass';
+  const isSoftfail = normalized === 'softfail';
   const cls = isPass
     ? 'bg-emerald-500/12 text-emerald-400 border border-emerald-500/30'
     : isSoftfail
@@ -58,7 +59,7 @@ export function AuthBadge({ result, label }: AuthBadgeProps) {
   return (
     <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase font-mono flex items-center gap-1.5 ${cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${isPass ? 'bg-emerald-400' : isSoftfail ? 'bg-amber-400' : 'bg-red-400'}`} />
-      {label}: {result.toUpperCase()}
+      {label}: {normalized.toUpperCase()}
     </span>
   );
 }
