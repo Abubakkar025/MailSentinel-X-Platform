@@ -9,6 +9,6 @@
     "@vercel/speed-insights": "^2.0.0"
   },
   "allowScripts": {
-    "unrs-resolver@1.12.2": true
+    "unrs-resolver": true
   }
 }
